@@ -25,6 +25,12 @@
 
 ---
 
+## Dashboard
+
+![Loom dashboard (demo mode)](docs/images/dashboard.png)
+
+*Dashboard in `--demo` mode (`python dash/server.py --demo`, port set by `LOOM_DASH_PORT`, default 8775). The figures on screen (for example "85% saved") are **synthetic demo data, not measurements** — see the work-in-progress notice above.*
+
 ## Installation
 
 > **The registry publication is pending.** The repository, the PyPI distribution and the npm package
