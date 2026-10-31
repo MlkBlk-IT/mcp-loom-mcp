@@ -9,6 +9,7 @@
 <img src="https://img.shields.io/badge/Python-3776ab?style=for-the-badge&logo=python&logoColor=white&labelColor=0d0d0d" /> <img src="https://img.shields.io/badge/FastMCP-00ff9c?style=for-the-badge&labelColor=0d0d0d" /> <img src="https://img.shields.io/badge/SQLite%20%2B%20FTS5-e10600?style=for-the-badge&logo=sqlite&logoColor=e10600&labelColor=0d0d0d" /> <img src="https://img.shields.io/badge/100%25%20CPU%20%C2%B7%200%20GPU%20%C2%B7%200%20paid%20API-00ff9c?style=for-the-badge&labelColor=0d0d0d" />
 
 [![M8ven Score](https://m8ven.ai/badge/mcp/mlkblk-it-mcp-loom-19dcvu)](https://m8ven.ai/mcp/mlkblk-it-mcp-loom-19dcvu?s=readme) [![M8ven Score](https://m8ven.ai/badge/mcp/mlkblk-it-loom-41lyje)](https://m8ven.ai/mcp/mlkblk-it-loom-41lyje?s=readme)
+[![PyPI](https://img.shields.io/pypi/v/mcp-loom-mcp?style=flat-square&logo=pypi)](https://pypi.org/project/mcp-loom-mcp/) [![npm](https://img.shields.io/npm/v/mcp-loom-mcp?style=flat-square&logo=npm)](https://www.npmjs.com/package/mcp-loom-mcp) [![GitHub stars](https://img.shields.io/github/stars/MlkBlk-IT/mcp-loom-mcp?style=flat-square)](https://github.com/MlkBlk-IT/mcp-loom-mcp/stargazers) ![README views](https://hits.sh/github.com/MlkBlk-IT/mcp-loom-mcp.svg?label=README%20views)
 
 </div>
 
@@ -33,16 +34,12 @@
 
 ## Installation
 
-> **The registry publication is pending.** The repository, the PyPI distribution and the npm package
-> all carry the same name — **`mcp-loom-mcp`** — and the packages are built, tagged and ready to
-> publish (`v0.1.3`). The names `mcp-loom` and `loom-mcp` belong to **other projects** on those
+> **Published:** the repository, PyPI distribution, npm package and Glama listing are public.
+> all carry the same name - **`mcp-loom-mcp`** - at version `v0.1.3`. The names `mcp-loom` and `loom-mcp` belong to **other projects** on those
 > registries — on PyPI a server for Loom's internal GraphQL API, on npm an unrelated DuckDB proxy —
 > and a registry never releases a name. That is why the repository was renamed from `Mcp-Loom` (the
 > old URL redirects automatically).
 >
-> The registry commands below are the final ones, but they return a 404 until the first publish.
-> Install from source in the meantime:
-> `pip install "mcp-loom-mcp @ git+https://github.com/MlkBlk-IT/mcp-loom-mcp.git"`.
 
 ```bash
 # PyPI
