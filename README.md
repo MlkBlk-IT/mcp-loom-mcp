@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<p align="center"><img src="https://raw.githubusercontent.com/MlkBlk-IT/mcp-loom-mcp/main/docs/readme-header.svg" width="100%" alt="mcp-loom-mcp visual header" /></p>
+<p align="center"><img src="https://raw.githubusercontent.com/MlkBlk-IT/mcp-loom-mcp/main/docs/mlkblk-banner.svg" width="100%" alt="mcp-loom-mcp — Malik Belkacemi · MLKBLK-IT" /></p>
 
 [![version](https://img.shields.io/badge/v0.1.3-e10600?style=for-the-badge&labelColor=0d0d0d)](https://github.com/MlkBlk-IT/mcp-loom-mcp/releases)
 
@@ -374,5 +374,14 @@ Focus: Sysadmin + Cyber + AI + Cloud
 <img src="https://capsule-render.vercel.app/api?type=waving&color=0:00ff9c,50:03150c,100:e10600&height=100&section=footer" width="100%" alt="" />
 
 **⚡ Built on CPU. Proven on disk. ⚡**
+
+</div>
+
+
+---
+
+<div align="center">
+
+<sub>Original project and documentation by <strong>Malik Belkacemi · MLKBLK-IT</strong> · © 2026</sub>
 
 </div>
