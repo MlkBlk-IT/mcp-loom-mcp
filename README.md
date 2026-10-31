@@ -346,7 +346,7 @@ $ .venv/Scripts/python.exe -m pytest -q --ignore=tests/test_allowed_dirs.py
 - **Deterministic extraction**: regex and heuristics only, never an LLM. A verifier that depends on an LLM cannot *prove* coverage.
 - **Honest measurement**: every report gives before/after tokens **counted by a real tokenizer**, never estimated.
 - **Audit before action**: reproducible benchmark, versioned corpus, per-session report in `docs/`.
-- **Portable by construction**: SQLite + FTS5, no proprietary SDK, no paid API.
+- **Portable by construction**: SQLite + FTS5, no proprietary SDK, CPU-first, compatible with local or cloud model workflows.
 
 ---
 
@@ -355,7 +355,7 @@ $ .venv/Scripts/python.exe -m pytest -q --ignore=tests/test_allowed_dirs.py
 1. **Moving ≠ summarizing** — lossy compression is a choice, not a technical necessity. Loom proves it with `retrievable = 1.0` across 63 measurements.
 2. **The token budget is an architecture problem, not a prompt problem** — the right answer is an indexed local drawer, not a shorter prompt.
 3. **Honest metrics do more work than flattering metrics** — naming `coverage` "visible in the anchor" instead of "covered" prevents a benchmark that lies.
-4. **An AI project can be 100% CPU and 100% local** — Python + SQLite, no GPU, no paid API.
+4. **An AI project can be CPU-first and provider-flexible** - Python + SQLite, no GPU required, with local or cloud model workflows supported by the surrounding MCP client.
 
 ---
 
