@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:e10600,50:1a0505,100:00ff9c&height=140&section=header&text=mcp-loom-mcp&fontSize=42&fontColor=e10600&fontAlignY=32&desc=Portable%20MCP%20context%20server%20%E2%80%94%20move%20it%2C%20never%20summarize%20it&descAlignY=53&descSize=15&descColor=00ff9c" width="100%" alt="mcp-loom-mcp" />
+<p align="center"><img src="https://raw.githubusercontent.com/MlkBlk-IT/mcp-loom-mcp/main/docs/readme-header.svg" width="100%" alt="mcp-loom-mcp visual header" /></p>
 
 [![version](https://img.shields.io/badge/v0.1.3-e10600?style=for-the-badge&labelColor=0d0d0d)](https://github.com/MlkBlk-IT/mcp-loom-mcp/releases)
 
