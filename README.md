@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<p align="center"><img src="https://raw.githubusercontent.com/MlkBlk-IT/mcp-loom-mcp/main/docs/mlkblk-banner.svg" width="100%" alt="mcp-loom-mcp — Malik Belkacemi · MLKBLK-IT" /></p>
+<p align="center"><img src="https://raw.githubusercontent.com/MlkBlk-IT/mcp-loom-mcp/main/docs/mlkblk-banner-v2.svg" width="100%" alt="Loom — Malik Belkacemi · MLKBLK-IT" /></p>
 
 [![version](https://img.shields.io/badge/v0.1.3-e10600?style=for-the-badge&labelColor=0d0d0d)](https://github.com/MlkBlk-IT/mcp-loom-mcp/releases)
 
