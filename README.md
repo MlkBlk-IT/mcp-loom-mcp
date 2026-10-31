@@ -367,6 +367,11 @@ $ .venv/Scripts/python.exe -m pytest -q --ignore=tests/test_allowed_dirs.py
 **Malik** — IT Support student (DEP), self-taught
 Focus: Sysadmin + Cyber + AI + Cloud
 
+
+## Ownership and license
+
+[Project origin and evidence](PROJECT-ORIGIN.md) · [License](LICENSE)
+
 ---
 
 <div align="center">
