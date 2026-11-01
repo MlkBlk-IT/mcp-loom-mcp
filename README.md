@@ -4,9 +4,9 @@
 
 <p align="center"><img src="https://raw.githubusercontent.com/MlkBlk-IT/mcp-loom-mcp/main/docs/mlkblk-banner-v2.svg" width="100%" alt="Loom — Malik Belkacemi · MLKBLK-IT" /></p>
 
-[![version](https://img.shields.io/badge/v0.1.3-e10600?style=for-the-badge&labelColor=0d0d0d)](https://github.com/MlkBlk-IT/mcp-loom-mcp/releases)
+[![version](https://img.shields.io/badge/v0.1.3-ff5fa2?style=for-the-badge&labelColor=0d0a2b)](https://github.com/MlkBlk-IT/mcp-loom-mcp/releases)
 
-<img src="https://img.shields.io/badge/Python-3776ab?style=for-the-badge&logo=python&logoColor=white&labelColor=0d0d0d" /> <img src="https://img.shields.io/badge/FastMCP-00ff9c?style=for-the-badge&labelColor=0d0d0d" /> <img src="https://img.shields.io/badge/SQLite%20%2B%20FTS5-e10600?style=for-the-badge&logo=sqlite&logoColor=e10600&labelColor=0d0d0d" /> <img src="https://img.shields.io/badge/100%25%20CPU%20%C2%B7%200%20GPU%20%C2%B7%200%20paid%20API-00ff9c?style=for-the-badge&labelColor=0d0d0d" />
+<img src="https://img.shields.io/badge/Python-3776ab?style=for-the-badge&logo=python&logoColor=white&labelColor=0d0a2b" /> <img src="https://img.shields.io/badge/FastMCP-2de2ff?style=for-the-badge&labelColor=0d0a2b" /> <img src="https://img.shields.io/badge/SQLite%20%2B%20FTS5-ff5fa2?style=for-the-badge&logo=sqlite&logoColor=ff5fa2&labelColor=0d0a2b" /> <img src="https://img.shields.io/badge/100%25%20CPU%20%C2%B7%200%20GPU%20%C2%B7%200%20paid%20API-2de2ff?style=for-the-badge&labelColor=0d0a2b" />
 
 [![M8ven Score](https://m8ven.ai/badge/mcp/mlkblk-it-mcp-loom-19dcvu)](https://m8ven.ai/mcp/mlkblk-it-mcp-loom-19dcvu?s=readme) [![M8ven Score](https://m8ven.ai/badge/mcp/mlkblk-it-loom-41lyje)](https://m8ven.ai/mcp/mlkblk-it-loom-41lyje?s=readme)
 [![PyPI](https://img.shields.io/pypi/v/mcp-loom-mcp?style=flat-square&logo=pypi)](https://pypi.org/project/mcp-loom-mcp/) [![npm](https://img.shields.io/npm/v/mcp-loom-mcp?style=flat-square&logo=npm)](https://www.npmjs.com/package/mcp-loom-mcp) [![GitHub stars](https://img.shields.io/github/stars/MlkBlk-IT/mcp-loom-mcp?style=flat-square)](https://github.com/MlkBlk-IT/mcp-loom-mcp/stargazers) ![README views](https://hits.sh/github.com/MlkBlk-IT/mcp-loom-mcp.svg?label=README%20views)
@@ -373,7 +373,7 @@ Focus: Sysadmin + Cyber + AI + Cloud
 
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:00ff9c,50:03150c,100:e10600&height=100&section=footer" width="100%" alt="" />
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:2de2ff,50:0d0a2b,100:ff5fa2&height=100&section=footer" width="100%" alt="" />
 
 **⚡ Built on CPU. Proven on disk. ⚡**
 
