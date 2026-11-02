@@ -13,12 +13,13 @@
 
 </div>
 
-> ## ⚠️ WORK IN PROGRESS — NOT READY FOR PRODUCTION (updated 2026-10-26)
+> ## ⚠️ WORK IN PROGRESS — NOT READY FOR PRODUCTION (updated 2026-11-02)
 > Loom is under repair and being re-measured. **Do not use in production.**
 > - **No token savings have been demonstrated to date.** The old figures (`saved_pct` 94–99%, `bench-report.json`, `bench_results.json`, `REPORT_FINAL.md`) measured the anchor size alone: they are **invalid**.
 > - Current real measurement (LM Studio, small local models, small documents): Loom costs **more** tokens than the baseline (fixed anchor overhead + tool schemas). The large-context test with a cloud model has not been done yet.
 > - Decision criterion frozen before the bench: same success rate with ≥ 35% fewer total tokens (in+out), retrieval and tool tax included. Otherwise: pivot or stop.
-> - Code state (measured 2026-10-25, see [`PROGRESS.md`](PROGRESS.md)): **83 passed / 19 failed / 1 collection error** across 103 test functions in 20 files. Most failures come from a code refactor that was not followed by a test update, plus 4 real anchor regressions (`port` kind, rare kinds, dates). `verify`, `redact`, `audit` and `sandbox` exist and their tests pass.
+> - Code state (measured 2026-11-02, see [`CHANGELOG.md`](CHANGELOG.md)): **110 passed / 0 failed** across the full test suite. The 19 failures of 2026-10-25 were caused by fixes (P9) that had been left in a stash and never re-applied after a remote merge; they are restored.
+> - **Latest updates (2026-11-02):** P9 fixes restored (anchor invariant quota, search rerank + `topup`, `port` kind, encoding hints, schemas without `anyOf`); `ctx_get` now isolates by session (`session_id`, cross-session only via `ctx_transfer`); vector index rebuild reads the encrypted DB and persists after save; Windows sandbox fail-closed with Job Object limits; safer `_path_allowed`; dashboard now shows a net, de-duplicated saving estimate. Token savings are still **not demonstrated** (cloud bench pending).
 > - The server exposes **17 MCP tools** — this section used to list 13. The tool table below is now the measured list.
 
 > **"Weave the context without cutting the thread."**
@@ -125,8 +126,8 @@ Loom moves nothing else. That is the whole thesis of the project.
 ## Current state
 
 **v0.1.1 — working core, honest test state.** **17 MCP tools** exposed, a reproducible benchmark on
-a 21-file corpus, and a test suite that is **not green**: 83 passed / 19 failed / 1 collection error
-(measured 2026-10-25 — [`PROGRESS.md`](PROGRESS.md)). Phase 2 (HTTP transport, rate-limiting and audit
+a 21-file corpus, and a test suite that is **green**: 110 passed / 0 failed
+(measured 2026-11-02 — [`CHANGELOG.md`](CHANGELOG.md)). Phase 2 (HTTP transport, rate-limiting and audit
 wired to the last 5 tools) in progress.
 
 ---
