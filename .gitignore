@@ -38,3 +38,7 @@ scripts/.hermes-tmp*
 
 # Scratch de réparation
 _repair/
+
+# artefacts de build / archives tierces
+dist_codex/
+docs/*.zip
