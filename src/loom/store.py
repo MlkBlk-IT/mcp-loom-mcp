@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import sqlite3
 import time
 from pathlib import Path
@@ -245,7 +246,14 @@ def _insert_anchor(
 def _insert_invariants(
     conn: sqlite3.Connection, session_id: str, invariants: list[tuple[str, str, int]]
 ) -> None:
-    """Insert invariants, skipping the ones already stored for this session."""
+    """Insert invariants, skipping the ones already stored for this session.
+
+    Skipped entirely in column-encrypted mode: extracted values are plaintext,
+    so persisting them would defeat the column encryption.
+    ``verify.check_session`` recomputes them from the decrypted chunks instead.
+    """
+    if _encryption().column_encrypted:
+        return
     conn.executemany(
         "INSERT INTO invariants (session_id, kind, value, priority) "
         "SELECT ?, ?, ?, ? WHERE NOT EXISTS ("
@@ -345,6 +353,7 @@ def save_all(
         if vector_index.available():
             texts = [chunk["text"] for chunk in chunks]
             vector_index.add_batch(ids, texts)
+            vector_index.save()
     except Exception:
         pass  # FTS still works; semantic is best-effort
 
@@ -546,8 +555,58 @@ def _escape_fts(query: str, mode: str = "AND") -> str:
     return sep.join('"' + term.replace('"', '""') + '"' for term in terms)
 
 
+_STOP = {
+    "the", "a", "an", "of", "at", "in", "on", "to", "for", "and", "or", "is", "are", "was",
+    "what", "which", "le", "la", "les", "de", "du", "des", "un", "une", "et", "au", "aux", "en", "dans",
+}
+# query word -> anchors.PATTERNS key: "what is the X port" wants a chunk that holds a port VALUE.
+_INTENT = {
+    "port": "port", "ports": "port", "version": "version", "versions": "version",
+    "url": "url", "urls": "url", "ip": "ip", "path": "path", "hash": "hex_hash",
+    "sha": "hex_hash", "sha256": "hex_hash",
+}
+_RERANK_WINDOW = 120
+
+
+def _rerank(results: list[dict[str, Any]], query: str) -> list[dict[str, Any]]:
+    """Reorder candidates by term proximity (+ value bonus), bm25 order breaks ties.
+
+    bm25 favours short chunks that repeat the query words; the chunk that holds the
+    actual value (`PORT = 8765`) is often longer and ranked far below them.
+    """
+    terms = [
+        t for t in dict.fromkeys(re.findall(r"[A-Za-z0-9]+", str(query).lower()))
+        if t not in _STOP and len(t) > 1
+    ]
+    if len(terms) < 2 or len(results) < 2:
+        return results
+    from loom import anchors as anchor_mod
+
+    kinds = [anchor_mod.PATTERNS[k] for k in {_INTENT[t] for t in terms if t in _INTENT}
+             if k in anchor_mod.PATTERNS]
+    word = {
+        t: re.compile(r"(?<![A-Za-z0-9])%s(?![A-Za-z0-9])" % re.escape(t), re.IGNORECASE)
+        for t in terms
+    }
+    scored = []
+    for pos, item in enumerate(results):
+        text = item["content"]
+        hits = sorted((m.start(), t) for t in terms for m in word[t].finditer(text))[:300]
+        vals = [m.start() for p in kinds for m in p.finditer(text)][:300]
+        best = 0.0
+        for p, _t in hits:
+            near = {t for q, t in hits if abs(q - p) <= _RERANK_WINDOW}
+            score = float(len(near))
+            if vals and any(abs(v - p) <= _RERANK_WINDOW for v in vals):
+                score += 1.5
+            best = max(best, score)
+        scored.append((-best, pos, item))
+    scored.sort(key=lambda x: (x[0], x[1]))
+    return [item for _s, _p, item in scored]
+
+
 def search(
-    query: str, session_id: str | None = None, limit: int = 10
+    query: str, session_id: str | None = None, limit: int = 10, topup: bool = False
 ) -> list[dict[str, Any]]:
     """Full-text search over stored chunks; ``session_id=None`` searches all sessions."""
     escaped = _escape_fts(query)
@@ -565,16 +624,20 @@ def search(
     if session_id is not None:
         sql += " AND c.session_id = ?"
         params.append(session_id)
+    multi = len(str(query).split()) > 1
+    pool = max(limit * 10, 50) if multi else limit
     sql += " ORDER BY rank LIMIT ?"
-    params.append(limit)
+    params.append(pool)
 
     conn = _connect()
     try:
         rows = conn.execute(sql, params).fetchall()
-        if not rows and len(str(query).split()) > 1:
-            # Strict AND found nothing: retry with OR, ranked by bm25 (best match first).
+        if (not rows or (topup and len(rows) < limit)) and multi:
+            # Strict AND found nothing (or topup and fewer than limit): add OR matches, bm25-ranked.
             params[0] = _escape_fts(query, "OR")
-            rows = conn.execute(sql, params).fetchall()
+            seen = {r["id"] for r in rows}
+            extra = [r for r in conn.execute(sql, params).fetchall() if r["id"] not in seen]
+            rows = list(rows) + extra[: max(0, pool - len(rows))]
     finally:
         conn.close()
 
@@ -593,7 +656,9 @@ def search(
         if source_sha and idx is not None:
             item["ref"] = f"{source_sha[:12]}#{idx}"
         results.append(item)
-    return results
+    if multi:
+        results = _rerank(results, query)
+    return results[:limit]
 
 
 def search_semantic(

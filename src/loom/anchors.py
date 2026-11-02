@@ -55,7 +55,7 @@ _HEX_HASH = (
 )
 
 # Port: the word "port", optional separator, the number.
-_PORT = r"(?<![\w])port\s*[=:]?\s*\d{1,5}(?![\w])"
+_PORT = r"(?<![\w])(?i:port)\s*[=:]?\s*\d{1,5}(?![\w])"
 
 # Model id: org/name or org/name/sub, optional ":tag" suffix.
 _MODEL_ID = (
@@ -72,6 +72,13 @@ _ENV_VAR = (
 # Number: optional sign, digits, optional fraction. A trailing sentence period
 # is allowed ("after 3." -> 3) but "1.2.3" must not become "1.2".
 _NUMBER = r"(?<![\w.])-?\d+(?:\.\d+)?(?!\.\d)(?![\w])"
+
+# Timestamps: matched ONLY to be consumed. Their digit groups (2026, 10, 24, 09,
+# 12, 03...) are fragments, not facts; as separate numbers they flooded the anchor.
+_DATETIME = (
+    r"(?<![\w.])(?:\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?"
+    r"(?:Z|[+-]\d{2}:?\d{2})?)?|\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?)(?![\w])"
+)
 
 # Constraint keywords. Longest alternatives first so "must not" wins over "must".
 _CONSTRAINT_KEYWORDS = re.compile(
@@ -94,6 +101,7 @@ PATTERNS: dict[str, re.Pattern[str]] = {
     "model_id": re.compile(_MODEL_ID),
     "env_var": re.compile(_ENV_VAR),
     "number": re.compile(_NUMBER),
+    "datetime": re.compile(_DATETIME),
 }
 
 # One pass for all structured values instead of one pass per pattern.
@@ -107,6 +115,7 @@ _COMBINED = re.compile(
     "|(?P<port>" + _PORT + ")"
     "|(?P<model_id>" + _MODEL_ID + ")"
     "|(?P<env_var>" + _ENV_VAR + ")"
+    "|(?P<datetime>" + _DATETIME + ")"
     "|(?P<number>" + _NUMBER + ")"
 )
 
@@ -298,6 +307,8 @@ def extract(text: str, limit: int | None = None) -> list[Invariant]:
 
     for match in _COMBINED.finditer(text):
         kind = match.lastgroup or "value"
+        if kind == "datetime":
+            continue  # consumed so its digits never become number invariants
         value = _post_process(kind, match.group(0))
         if not value:
             continue

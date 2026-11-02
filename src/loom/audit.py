@@ -1,38 +1,17 @@
-"""Audit logging for Loom MCP server using structlog JSONL.
+"""Audit logging for Loom MCP server, one JSON object per line.
 
 Logs every tool call with: request_id, session_id, tool, latency, outcome.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import time
 import uuid
 from pathlib import Path
 from typing import Optional
-
-try:
-    import structlog
-    HAS_STRUCTLOG = True
-except ImportError:
-    HAS_STRUCTLOG = False
-
-# Configure structlog
-if HAS_STRUCTLOG:
-    structlog.configure(
-        processors=[
-            structlog.stdlib.filter_by_level,
-            structlog.stdlib.add_logger_name,
-            structlog.stdlib.add_log_level,
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.JSONRenderer(),
-        ],
-        context_class=dict,
-        logger_factory=structlog.stdlib.LoggerFactory(),
-        wrapper_class=structlog.stdlib.BoundLogger,
-        cache_logger_on_first_use=True,
-    )
 
 # Audit log directory
 AUDIT_DIR = Path(os.environ.get("LOOM_AUDIT_DIR", Path.home() / ".loom" / "audit"))
@@ -78,13 +57,11 @@ def audit_tool_call(
     if error:
         log_entry["error"] = error
 
-    logger = get_audit_logger()
-    logger.info(str(log_entry).replace("'", '"') if not HAS_STRUCTLOG else None)
-
-    # Use structlog if available
-    if HAS_STRUCTLOG:
-        slogger = structlog.get_logger("loom.audit")
-        slogger.info("tool_call", **log_entry)
+    # One JSON object per line: every entry round-trips through json.loads.
+    # The timestamp is stamped here because the stdlib handler formatter
+    # only emits %(message)s.
+    log_entry["ts"] = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
+    get_audit_logger().info(json.dumps(log_entry, ensure_ascii=False))
 
 
 def audit_summary() -> dict:

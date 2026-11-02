@@ -29,16 +29,11 @@ def check_session(session_id: str = "default") -> dict[str, Any]:
     store time); otherwise it is recomputed from the chunks. This keeps verification
     fast even on a very large session.
     """
-    conn = store._connect()
-    rows = conn.execute(
-        "SELECT id, label, content FROM chunks WHERE session_id = ? ORDER BY id",
-        (session_id,),
-    ).fetchall()
-    anchor_rows = conn.execute(
-        "SELECT body FROM anchors WHERE session_id = ? ORDER BY id",
-        (session_id,),
-    ).fetchall()
-    conn.close()
+    # Read through the decrypting accessors. In column-encrypted mode the raw
+    # columns hold ciphertext, and hashing that would report every anchor as
+    # lost even though the stored plaintext is intact.
+    rows = list(store.iter_session_chunks(session_id))
+    anchor_rows = store.load_anchors(session_id)
 
     if not rows:
         return {

@@ -14,7 +14,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from loom import store
+from loom import crypto, store
 
 
 # ---------------------------------------------------------------------------
@@ -196,6 +196,12 @@ def purge_session(session_id: str) -> dict[str, Any]:
                 (session_id,),
             ).fetchall()
             for row in fts_rows:
+                # Fernet rows are never handed to the FTS index (see
+                # store._insert_chunks), so replaying their ciphertext as a
+                # 'delete' would feed the index a value it never stored and
+                # corrupt it. Skipping is the only faithful replay.
+                if row["content"].startswith(crypto.FERNET_TOKEN_PREFIX):
+                    continue
                 conn.execute(
                     "INSERT INTO chunks_fts (chunks_fts, rowid, label, content) "
                     "VALUES ('delete', ?, ?, ?)",

@@ -250,7 +250,8 @@ def rebuild_from_db(db_path: Path) -> int:
     of chunks embedded.
     """
     import sqlite3
-    conn = sqlite3.connect(str(db_path))
+    from loom import crypto
+    conn = crypto.connect_encrypted(db_path)
     conn.row_factory = sqlite3.Row
     rows = conn.execute("SELECT id, content FROM chunks ORDER BY id").fetchall()
     conn.close()

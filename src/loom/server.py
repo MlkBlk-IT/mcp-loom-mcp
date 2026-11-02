@@ -6,11 +6,15 @@ Business logic lives in the sibling modules; this file only exposes it as MCP to
 from __future__ import annotations
 
 import hashlib
+import re
 import logging
 import os
 import time
 
+from typing import Annotated
+
 from fastmcp import FastMCP
+from pydantic import BeforeValidator
 from mcp.types import ToolAnnotations
 
 from loom import anchors as anchor_mod
@@ -40,6 +44,9 @@ Losing a number, a path, a version or an explicit constraint is a bug, not a tra
 
 mcp = FastMCP(name=SERVER_NAME, instructions=INSTRUCTIONS)
 
+# Max chunk ids echoed in a ctx_store* response (the rest: chunk_id_first/last).
+MAX_IDS_IN_RESPONSE = 20
+
 _rate_limiter = get_rate_limiter()
 
 
@@ -64,30 +71,52 @@ def _audit_call(tool: str, session_id: str, start: float, outcome: str, error: s
 import time
 
 
-@mcp.tool(
-    annotations=ToolAnnotations(
-        read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=False
-    )
-)
-def ctx_store(content: str, session_id: str = "default", label: str = "") -> dict:
-    """Move bulky content out of the prompt into a local drawer, without losing any of it.
+def _path_allowed(path: str, dirs: list[str]) -> bool:
+    """True if `path` is inside one of `dirs` (realpath + case-normalised + commonpath).
 
-    Returns a dense anchor (the parts that must stay in context) plus stable IDs so the
-    original bytes can be retrieved later with `ctx_get`.
-
-    Args:
-        content: the bulky text to store (log dump, file body, tool output, etc.)
-        session_id: logical session the content belongs to (auto UUIDv7 if "default" or omitted)
-        label: short human-readable name, e.g. "build.log"
-
-    Returns:
-        dict with anchor, chunk ids, token counts (before/after) and savings ratio.
+    Avoids the prefix bug of str.startswith ('/a/ok' must not allow '/a/ok_evil'),
+    follows symlinks, and is case-insensitive on Windows.
     """
-    start = time.perf_counter()
-    rl = _check_rate_limit(session_id)
-    if rl is not None:
-        _audit_call("ctx_store", session_id, start, "error", rl["error"])
-        return rl
+    import os as _o
+
+    p = _o.path.normcase(_o.path.realpath(path))
+    for d in dirs:
+        base = _o.path.normcase(_o.path.realpath(d))
+        try:
+            if _o.path.commonpath([p, base]) == base:
+                return True
+        except ValueError:  # different drives on Windows
+            continue
+    return False
+
+
+def _excerpt(content: str, query: str, width: int = 600) -> str:
+    """Window of `width` chars centred on the densest cluster of query terms."""
+    if len(content) <= width:
+        return content
+    terms = set(re.findall(r"\w+", query.lower()))
+    hits = sorted(
+        (m.start(), t)
+        for t in terms
+        for m in re.finditer(r"\b%s\b" % re.escape(t), content, re.IGNORECASE)
+    )[:200]
+    if not hits:
+        return content[:width]
+    half = width // 2
+    best = max(
+        hits,
+        key=lambda h: (len({t for p, t in hits if abs(p - h[0]) <= half}), -h[0]),
+    )
+    start = max(0, best[0] - half)
+    return content[start : start + width]
+
+
+def _store_impl(content: str, session_id: str = "default", label: str = "") -> dict:
+    """Redact, compress and persist content.
+
+    No rate limit and no audit here: every caller owns exactly one
+    rate-limit check and one audit entry describing its real outcome.
+    """
     resolved_session = session.resolve_session_id(session_id)
     # Ensure session exists in metadata
     session.create_session(resolved_session, label=label)
@@ -100,6 +129,13 @@ def ctx_store(content: str, session_id: str = "default", label: str = "") -> dic
     tokens_before = count_tokens(content)
     anchor, chunks = compress.build_anchor(content, profile=profile)
     anchor_tokens = count_tokens(anchor)
+    # Break-even guard: below ~3k tokens the anchor (invariants + facts + footer)
+    # outweighs the source. Hand the content back verbatim instead; the chunks are
+    # still stored, so ctx_get / ctx_search keep working.
+    passthrough = anchor_tokens >= tokens_before
+    if passthrough:
+        anchor = content
+        anchor_tokens = tokens_before
     invariants = anchor_mod.extract(content)
     saved = store.save_all(
         resolved_session,
@@ -117,19 +153,62 @@ def ctx_store(content: str, session_id: str = "default", label: str = "") -> dic
     # Touch session updated_at
     session.touch_session(resolved_session)
 
-    result = {
+    # A big source yields thousands of ids; echoing them all costs more context than
+    # the anchor itself. Ids are contiguous (ctx_verify relies on it), and the anchor
+    # footer already carries refs usable with ctx_get("<sha12>#<idx>").
+    ids_out = ids
+    ids_meta: dict = {}
+    if len(ids) > MAX_IDS_IN_RESPONSE:
+        ids_out = ids[:MAX_IDS_IN_RESPONSE]
+        ids_meta = {
+            "chunk_ids_truncated": True,
+            "chunk_count": len(ids),
+            "chunk_id_first": ids[0],
+            "chunk_id_last": ids[-1],
+        }
+
+    return {
         "session_id": resolved_session,
         "anchor": anchor,
-        "chunk_ids": ids,
+        "chunk_ids": ids_out,
+        **ids_meta,
+        "passthrough": passthrough,
         "tokens_before": tokens_before,
         "tokens_after": anchor_tokens,
         "saved_ratio": (
             round(1 - (anchor_tokens / tokens_before), 4) if tokens_before else 0.0
         ),
-        "lossless": True,
+        "lossless": redaction_count == 0,
         "redactions": redaction_count,
     }
-    _audit_call("ctx_store", resolved_session, start, "success")
+
+
+@mcp.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=False
+    )
+)
+def ctx_store(content: str, session_id: str = "default", label: str = "") -> dict:
+    """Move bulky content out of the prompt into a local drawer, without losing any of it.
+
+    Returns a dense anchor (the parts that must stay in context) plus stable IDs so the
+    original bytes can be retrieved later with `ctx_get`.
+
+    Args:
+        content: the bulky text to store (log dump, file body, tool output, etc.)
+        session_id: logical session the content belongs to ("default" or omitted = the shared "default" session)
+        label: short human-readable name, e.g. "build.log"
+
+    Returns:
+        dict with anchor, chunk ids, token counts (before/after) and savings ratio.
+    """
+    start = time.perf_counter()
+    rl = _check_rate_limit(session_id)
+    if rl is not None:
+        _audit_call("ctx_store", session_id, start, "error", rl["error"])
+        return rl
+    result = _store_impl(content, session_id, label)
+    _audit_call("ctx_store", result["session_id"], start, "success")
     return result
 
 
@@ -138,36 +217,59 @@ def ctx_store(content: str, session_id: str = "default", label: str = "") -> dic
         read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False
     )
 )
-def ctx_get(chunk_id: str | int) -> dict:
+def ctx_get(
+    chunk_id: Annotated[str, BeforeValidator(str)], session_id: str = "default"
+) -> dict:
     """Retrieve a stored chunk, byte-identical to what was originally stored.
 
     Args:
-        chunk_id: id returned by `ctx_store` in `chunk_ids` (int or its string form)
+        chunk_id: id returned by `ctx_store` in `chunk_ids` (int or its string form), or a
+            `<sha12>#<idx>` ref from the anchor footer
+        session_id: session to retrieve from (default: "default"); a chunk of another
+            session is only readable after an explicit ctx_transfer
 
     Returns:
         dict with the original content and its metadata.
     """
     start = time.perf_counter()
-    rl = _check_rate_limit("default")
+    resolved_session = session.resolve_session_id(session_id)
+    rl = _check_rate_limit(resolved_session)
     if rl is not None:
-        _audit_call("ctx_get", "default", start, "error", rl["error"])
+        _audit_call("ctx_get", resolved_session, start, "error", rl["error"])
         return rl
-    try:
-        cid = int(chunk_id)
-    except (TypeError, ValueError):
-        res = {"found": False, "error": f"invalid chunk_id {chunk_id!r}: expected an integer."}
-        _audit_call("ctx_get", "default", start, "error", res["error"])
-        return res
-    chunk = store.load_chunk(cid)
+    from loom import cross_session
+
+    if isinstance(chunk_id, str) and "#" in chunk_id:
+        chunk = store.load_chunk_by_ref(chunk_id)
+        # Fail closed: a ref hit is only returned if its session can read it.
+        if chunk is not None:
+            cid = chunk.get("id")
+            chunk = (
+                cross_session.get_cross_session(int(cid), resolved_session)
+                if cid is not None
+                else None
+            )
+    else:
+        try:
+            cid = int(chunk_id)
+        except (TypeError, ValueError):
+            res = {
+                "found": False,
+                "error": f"invalid chunk_id {chunk_id!r}: expected an integer or '<sha12>#<idx>'.",
+            }
+            _audit_call("ctx_get", resolved_session, start, "error", res["error"])
+            return res
+        chunk = cross_session.get_cross_session(cid, resolved_session)
     if chunk is None:
         res = {
             "found": False,
-            "error": f"chunk {chunk_id!r} not found. It may have been pruned; "
+            "error": f"chunk {chunk_id!r} not found or not accessible from session "
+            f"{resolved_session!r}. It may have been pruned; "
             f"call ctx_store again with the content.",
         }
-        _audit_call("ctx_get", "default", start, "error", res["error"])
+        _audit_call("ctx_get", resolved_session, start, "error", res["error"])
         return res
-    _audit_call("ctx_get", "default", start, "success")
+    _audit_call("ctx_get", resolved_session, start, "success")
     return {"found": True, "content": chunk["content"], "label": chunk["label"]}
 
 
@@ -406,30 +508,47 @@ def ctx_store_file(path: str, session_id: str = "default", label: str = "") -> d
 
     max_mb = float(_os.environ.get("LOOM_MAX_FILE_MB", "50"))
     allowed = _os.environ.get("LOOM_ALLOWED_DIRS")
-    resolved = _os.path.abspath(path)
+    resolved = _os.path.realpath(path)
     if allowed:
         dirs = [d for d in allowed.split(";;") if d]
-        if not any(resolved.startswith(_os.path.abspath(d)) for d in dirs):
-            return {"error": f"path outside allowed dirs: {resolved}"}
+        if not _path_allowed(resolved, dirs):
+            res = {"error": f"path outside allowed dirs: {resolved}"}
+            _audit_call("ctx_store_file", session_id, start, "error", res["error"])
+            return res
 
     try:
         size = _os.path.getsize(resolved)
     except OSError as exc:
-        return {"error": str(exc)}
+        res = {"error": str(exc)}
+        _audit_call("ctx_store_file", session_id, start, "error", res["error"])
+        return res
     if size > max_mb * 1024 * 1024:
-        return {"error": f"file too large: {size} bytes (limit {max_mb} MB)"}
+        res = {"error": f"file too large: {size} bytes (limit {max_mb} MB)"}
+        _audit_call("ctx_store_file", session_id, start, "error", res["error"])
+        return res
 
     try:
         with open(resolved, "rb") as f:
             raw = f.read()
         content = raw.decode("utf-8")
     except UnicodeDecodeError as exc:
-        return {"error": f"invalid utf-8: {exc}"}
+        hint = (
+            " File looks like UTF-16 (default of Windows PowerShell '>' / Out-File):"
+            " re-save it as UTF-8."
+            if raw.startswith((b"\xff\xfe", b"\xfe\xff"))
+            else " File is not valid UTF-8 (cp1252/latin-1?): re-save it as UTF-8."
+        )
+        res = {"error": f"invalid utf-8: {exc}.{hint}"}
+        _audit_call("ctx_store_file", session_id, start, "error", res["error"])
+        return res
     except OSError as exc:
-        return {"error": str(exc)}
+        res = {"error": str(exc)}
+        _audit_call("ctx_store_file", session_id, start, "error", res["error"])
+        return res
 
-    _audit_call("ctx_store_file", session_id, start, "success")
-    return ctx_store(content=content, session_id=session_id, label=label)
+    result = _store_impl(content, session_id, label)
+    _audit_call("ctx_store_file", result["session_id"], start, "success")
+    return result
 
 
 @mcp.tool(
@@ -441,7 +560,7 @@ def ctx_store_cmd(cmd: str, session_id: str = "default", label: str = "") -> dic
     """Run a shell command in a sandbox, capture its output, and store it in the Loom drawer.
 
     Requires LOOM_STORE_CMD=1 to be set (opt-in). Sandbox enforces CPU, memory,
-    process, and network limits. Fails closed if sandbox unavailable.
+    and process limits (no network isolation on Windows). Fails closed if sandbox unavailable.
 
     Args:
         cmd: shell command to execute
@@ -480,8 +599,9 @@ def ctx_store_cmd(cmd: str, session_id: str = "default", label: str = "") -> dic
     if result.stderr:
         content += "\n\n[stderr]\n" + result.stderr
 
-    _audit_call("ctx_store_cmd", session_id, start, "success")
-    return ctx_store(content=content, session_id=session_id, label=label)
+    out = _store_impl(content, session_id, label)
+    _audit_call("ctx_store_cmd", out["session_id"], start, "success")
+    return out
 
 
 @mcp.tool(
@@ -499,7 +619,7 @@ def ctx_search(query: str, limit: int = 5, session_id: str = "default", semantic
     Args:
         query: search query (natural language or keywords)
         limit: max results (default 5)
-        session_id: session to search (default: all sessions when semantic, or "default")
+        session_id: session to search ("default" = the shared default session only)
         semantic: use semantic search first (default True)
 
     Returns:
@@ -518,7 +638,7 @@ def ctx_search(query: str, limit: int = 5, session_id: str = "default", semantic
         try:
             from loom import vector_index
             if vector_index.available():
-                sid = None if session_id == "default" else session_id
+                sid = session_id
                 sem = store.search_semantic(query, session_id=sid, limit=limit)
                 if sem:
                     mode = "semantic"
@@ -527,13 +647,13 @@ def ctx_search(query: str, limit: int = 5, session_id: str = "default", semantic
             pass  # fall through to FTS
 
     if not results:
-        results = store.search(query, limit=limit, session_id=session_id)
+        results = store.search(query, limit=limit, session_id=session_id, topup=True)
 
     result = {
         "query": query,
         "mode": mode,
         "results": [
-            {"chunk_id": r["id"], "label": r["label"], "content": r["content"][:500],
+            {"chunk_id": r["id"], "label": r["label"], "content": _excerpt(r["content"], query),
              "session_id": r.get("session_id", ""),
              **({"score": r["score"]} if "score" in r else {})}
             for r in results
@@ -549,7 +669,7 @@ def ctx_search(query: str, limit: int = 5, session_id: str = "default", semantic
         read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False
     )
 )
-def ctx_verify(session_id: str | None = None) -> dict:
+def ctx_verify(session_id: str = "") -> dict:
     """Verify source integrity by rebuilding each source from its chunks.
 
     For every stored source, reconstructs the original bytes from its chunks
@@ -562,7 +682,7 @@ def ctx_verify(session_id: str | None = None) -> dict:
     if rl is not None:
         _audit_call("ctx_verify", key, start, "error", rl["error"])
         return rl
-    resolved = session.resolve_session_id(key) if session_id is not None else None
+    resolved = session.resolve_session_id(key) if session_id else None
     sources = store.load_sources(resolved)
     out = []
     all_ok = True
@@ -677,7 +797,21 @@ def ctx_vector_stats() -> dict:
 def main() -> None:
     """Entry point for `loom-mcp` console script (stdio transport)."""
     logging.basicConfig(level=os.environ.get("LOOM_LOG_LEVEL", "INFO"))
-    log.info("starting loom-mcp")
+    transport = os.environ.get("LOOM_TRANSPORT", "stdio").strip().lower()
+    if transport not in ("stdio", "http", "streamable-http", "sse"):
+        raise SystemExit(
+            f"invalid LOOM_TRANSPORT={transport!r}: use stdio (default), http, streamable-http or sse"
+        )
+    log.info("starting loom-mcp (transport=%s)", transport)
+    if transport != "stdio":
+        host = os.environ.get("LOOM_HOST", "127.0.0.1")
+        port = int(os.environ.get("LOOM_PORT", "8770"))
+        if host not in ("127.0.0.1", "localhost", "::1"):
+            log.warning(
+                "loom-mcp has no authentication: binding to %s exposes the context store", host
+            )
+        mcp.run(transport=transport, host=host, port=port)
+        return
     mcp.run()
 
 

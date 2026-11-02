@@ -52,6 +52,9 @@ async def test_stdio_server_lists_tools():
                 "ctx_store_cmd",
                 "ctx_search",
                 "ctx_verify",
+        "ctx_transfer",
+        "ctx_rebuild_index",
+        "ctx_vector_stats",
             }
             print("\nTOOLS:", sorted(names))
             print("SCHEMAS OK for all tools")

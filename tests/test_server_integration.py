@@ -48,6 +48,9 @@ async def test_server_lists_five_tools(client):
         "ctx_store_cmd",
         "ctx_search",
         "ctx_verify",
+        "ctx_transfer",
+        "ctx_rebuild_index",
+        "ctx_vector_stats",
     }
 
 

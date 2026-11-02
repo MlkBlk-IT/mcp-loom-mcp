@@ -42,3 +42,7 @@ _repair/
 # artefacts de build / archives tierces
 dist_codex/
 docs/*.zip
+
+# scratch de tests / backups locaux
+_test/
+*.bak_*

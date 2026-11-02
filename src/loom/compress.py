@@ -19,6 +19,7 @@ from loom.profile import Profile, get_profile
 # Cheap, high-signal markers. Plain substrings — no regex per line.
 KEEP_MARKERS = (
     "exit_code",
+    "exit code",
     "exit status",
     "exitcode",
     "traceback",
@@ -47,9 +48,17 @@ CONSTRAINT_HINT = re.compile(
 )
 
 MAX_ANCHOR_LINES = 400
+# A fact longer than this is clipped in the anchor (full line stays in the drawer)
+# and scored lower: very long lines are low information density.
+MAX_FACT_CHARS = 300
 LINES_PER_CHUNK = 10
 MAX_CHUNK_BYTES = 16 * 1024  # 16 KiB — a retrieval unit must stay small enough to re-read
 MAX_INVARIANTS_IN_ANCHOR = 200
+MAX_NUMBERS_IN_ANCHOR = 30
+# Rare, cheap, high-value kinds: reserved a slice of the budget so a few hundred
+# paths/env vars (sorted before them by kind name) can never starve them.
+RARE_KINDS = ("port", "ip", "url", "hex_hash")
+RARE_SHARE = 0.10
 
 # Share of the anchor budget reserved per invariant priority. Constraints are the
 # must-keep section; numbers are the least valuable per character.
@@ -115,6 +124,31 @@ def _score_line(line: str) -> int:
     return score
 
 
+def _clip_fact(line: str) -> str:
+    return line if len(line) <= MAX_FACT_CHARS else line[: MAX_FACT_CHARS - 1] + "\u2026"
+
+
+def _fit_facts(facts: list[tuple[int, str]], budget_chars: int) -> list[str]:
+    """Keep the highest-scoring facts that fit the budget, returned in original order.
+
+    `budget_chars == 0` means UNLIMITED. Selection is by score (ties: earliest
+    first), NOT by position: a FAILED line near the end must beat a PASSED line
+    near the top.
+    """
+    if not budget_chars:
+        return [text for _, text in facts]
+    order = sorted(range(len(facts)), key=lambda i: (-facts[i][0], i))
+    keep: set[int] = set()
+    used = 0
+    for i in order:
+        cost = len(facts[i][1]) + 3
+        if used + cost > budget_chars:
+            continue
+        keep.add(i)
+        used += cost
+    return [facts[i][1] for i in sorted(keep)]
+
+
 def _fit_lines(lines: list[str], budget_chars: int) -> list[str]:
     """Take lines in order while they fit in the budget, and report the rest."""
     if not budget_chars:
@@ -141,6 +175,22 @@ def _select_invariants(invariants: list[anchor_mod.Invariant], budget_chars: int
         return []
 
     unlimited = not budget_chars
+    if not unlimited:
+        # Plain numbers are the lowest-value invariants (latencies, ids, counts). Cap
+        # them and prefer the longest (most specific); the rest stay in the drawer.
+        others = [i for i in invariants if i.kind != "number"]
+        nums = sorted(
+            (i for i in invariants if i.kind == "number"),
+            key=lambda i: (-len(i.value), i.value),
+        )[:MAX_NUMBERS_IN_ANCHOR]
+        keep_ids = {id(i) for i in others + nums}
+        invariants = [i for i in invariants if id(i) in keep_ids] + [
+            i for i in invariants if id(i) not in keep_ids
+        ]
+        capped = len(invariants) - len(keep_ids)
+        invariants = invariants[: len(keep_ids)]
+    else:
+        capped = 0
     lines: list[str] = []
     used = 0
     for inv in invariants:
@@ -152,7 +202,7 @@ def _select_invariants(invariants: list[anchor_mod.Invariant], budget_chars: int
         lines.append(line)
         used += len(line) + 1
 
-    dropped = len(invariants) - len(lines)
+    dropped = len(invariants) + capped - len(lines)
     if dropped:
         note = f"- ... {dropped} more invariants in the drawer (retrieve with ctx_get)"
         if not unlimited:
@@ -234,8 +284,10 @@ def build_anchor(
         if not line.strip():
             continue
         s = _score_line(line)
+        if len(line) > MAX_FACT_CHARS:
+            s = (s + 1) // 2
         if s > 0:
-            scored.append((s, line.strip()))
+            scored.append((s, _clip_fact(line.strip())))
 
     # Keep the highest-scoring lines, in original order, up to the cap.
     limit = MAX_ANCHOR_LINES
@@ -243,7 +295,7 @@ def build_anchor(
         limit = min(limit, max(20, profile.max_anchor_chars // 12))
     chosen_idx = sorted(range(len(scored)), key=lambda i: (-scored[i][0], i))[:limit]
     chosen = set(chosen_idx)
-    facts = [scored[i][1] for i in range(len(scored)) if i in chosen]
+    facts = [scored[i] for i in range(len(scored)) if i in chosen]
 
     # --- footer (built FIRST, never truncated) -------------------------------
     # The footer is the pointer to the drawer. It is deterministic and
@@ -270,10 +322,15 @@ def build_anchor(
     # NOTE: a budget of 0 means UNLIMITED for both _select_invariants and
     # _fit_lines, so a real (but tiny) budget must never be expressed as 0.
     budget = profile.max_anchor_chars or 0
+    rare_inv = [i for i in invariants if i.kind in RARE_KINDS]
+    rare_budget = 0
     if budget:
         body_budget = max(0, budget - len(footer) - 1)
         inv_budget = max(1, int(body_budget * 0.55))
-        fact_budget = max(1, body_budget - inv_budget)
+        if rare_inv:
+            need = sum(len(i.kind) + len(i.value) + 6 for i in rare_inv) + 1
+            rare_budget = min(need, int(body_budget * RARE_SHARE))
+        fact_budget = max(1, body_budget - inv_budget - rare_budget)
     else:
         body_budget = 0
         inv_budget = 0
@@ -282,10 +339,15 @@ def build_anchor(
     anchor_parts: list[str] = []
     if invariants:
         anchor_parts.append("**Invariants**")
-        anchor_parts.extend(_select_invariants(invariants, inv_budget))
+        if rare_budget:
+            anchor_parts.extend(_select_invariants(rare_inv, rare_budget))
+            rest = [i for i in invariants if i.kind not in RARE_KINDS]
+            anchor_parts.extend(_select_invariants(rest, inv_budget))
+        else:
+            anchor_parts.extend(_select_invariants(invariants, inv_budget))
     if facts:
         anchor_parts.append("**Facts**")
-        kept_facts = _fit_lines(facts, fact_budget)
+        kept_facts = _fit_facts(facts, fact_budget)
         anchor_parts.extend(f"- {f}" for f in kept_facts)
         if len(kept_facts) < len(facts):
             anchor_parts.append(
