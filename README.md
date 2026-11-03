@@ -13,6 +13,18 @@
 
 </div>
 
+# Loom — `mcp-loom-mcp`
+
+| At a glance | |
+|---|---|
+| **Status** | ⚠️ **under repair — not production-ready.** The notice below states exactly what is and is not demonstrated. |
+| **Version** | `v0.1.3` — published as `mcp-loom-mcp` on PyPI, npm and Glama |
+| **MCP tools** | **17** |
+| **Tests** | **110 passed / 0 failed** — measured 2026-11-02 |
+| **Stack** | FastMCP · SQLite + FTS5 (BM25) · 100 % CPU · 0 GPU · 0 paid API |
+| **Works today** | context moved out of the prompt, lexical search, session isolation, sandboxed tool execution, encrypted vector index |
+| **Not demonstrated** | **token savings** — the old 94–99 % figures measured the anchor size alone and are invalid; the large-context cloud benchmark is still pending |
+
 > ## ⚠️ WORK IN PROGRESS — NOT READY FOR PRODUCTION (updated 2026-11-02)
 > Loom is under repair and being re-measured. **Do not use in production.**
 > - **No token savings have been demonstrated to date.** The old figures (`saved_pct` 94–99%, `bench-report.json`, `bench_results.json`, `REPORT_FINAL.md`) measured the anchor size alone: they are **invalid**.
