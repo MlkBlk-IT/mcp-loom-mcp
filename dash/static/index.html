@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Loom Dashboard</title>
-<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/style.css?v=8">
 </head>
 <body>
 
@@ -22,10 +22,14 @@
     <button class="nav-item active" data-section="overview"><span class="nav-ico">▣</span> Overview</button>
     <button class="nav-item" data-section="storage"><span class="nav-ico">▤</span> Storage</button>
     <button class="nav-item" data-section="audit"><span class="nav-ico">⚡</span> Audit Live</button>
-    <button class="nav-item" data-section="tools"><span class="nav-ico">⛏</span> Outils</button>
+    <button class="nav-item" data-section="tools"><span class="nav-ico">⛏</span> Tools</button>
     <button class="nav-item" data-section="invariants"><span class="nav-ico">◆</span> Invariants</button>
     <button class="nav-item" data-section="sessions"><span class="nav-ico">⟡</span> Sessions</button>
     <button class="nav-item" data-section="upgrade"><span class="nav-ico">⚡</span> Upgrade P1-P3</button>
+    <div class="nav-sep"></div>
+    <button class="nav-item" data-section="quickstart"><span class="nav-ico">🚀</span> Quickstart</button>
+    <button class="nav-item" data-section="howto"><span class="nav-ico">📖</span> How-to</button>
+    <button class="nav-item" data-section="help"><span class="nav-ico">❔</span> Help</button>
   </nav>
 
   <div class="sidebar-spacer"></div>
@@ -99,33 +103,17 @@
     <div class="kpi-grid" id="kpi-grid"></div>
     <div class="chart-row">
       <div class="panel chart-panel">
-        <div class="panel-head"><h3>Appels / minute</h3><span class="chip" id="calls-total">0</span></div>
+        <div class="panel-head"><h3>Calls / minute</h3><span class="chip" id="calls-total">0</span></div>
         <canvas id="chart-calls"></canvas>
       </div>
       <div class="panel chart-panel">
-        <div class="panel-head"><h3>Latence p50 / p95</h3><span class="chip" id="lat-max">—</span></div>
+        <div class="panel-head"><h3>Latency</h3><span class="chip" id="lat-max">—</span></div>
         <canvas id="chart-lat"></canvas>
       </div>
       <div class="panel chart-panel gauge-panel">
-        <div class="panel-head"><h3>Économie tokens</h3></div>
+        <div class="panel-head"><h3>Savings</h3><button class="more-btn" data-drawer="kpi">Details</button></div>
         <canvas id="chart-gauge"></canvas>
       </div>
-    </div>
-    <div class="panel">
-      <div class="panel-head">
-        <h3>Événements récents</h3>
-        <input type="text" class="search-input" id="event-search" placeholder="Filtrer (tool, session, outcome)…">
-      </div>
-      <table class="data-table">
-        <thead><tr>
-          <th class="sort-th" data-sort="ts">Timestamp ⇅</th>
-          <th class="sort-th" data-sort="tool">Outil ⇅</th>
-          <th class="sort-th" data-sort="session_id">Session ⇅</th>
-          <th class="sort-th" data-sort="outcome">Outcome ⇅</th>
-          <th class="sort-th" data-sort="latency_ms">Latence ⇅</th>
-        </tr></thead>
-        <tbody id="events-tbody"></tbody>
-      </table>
     </div>
   </section>
 
@@ -134,7 +122,7 @@
     <div class="kpi-grid" id="store-kpi"></div>
     <div class="chart-row">
       <div class="panel chart-panel">
-        <div class="panel-head"><h3>Tokens par source</h3><span class="chip" id="saved-chip">—</span></div>
+        <div class="panel-head"><h3>Tokens per source</h3><span class="chip" id="saved-chip">—</span></div>
         <canvas id="chart-tokens"></canvas>
       </div>
       <div class="panel chart-panel">
@@ -142,14 +130,14 @@
         <canvas id="chart-chunkmap"></canvas>
       </div>
       <div class="panel chart-panel gauge-panel">
-        <div class="panel-head"><h3>Économie</h3></div>
+        <div class="panel-head"><h3>Savings</h3></div>
         <canvas id="chart-gauge2"></canvas>
       </div>
     </div>
     <div class="panel">
-      <div class="panel-head"><h3>Sources <span class="chip" id="src-count">0</span></h3></div>
+      <div class="panel-head"><h3>Sources</h3><span class="chip" id="src-count">0</span><button class="more-btn" data-drawer="sources">Details</button></div>
       <table class="data-table">
-        <thead><tr><th>ID</th><th>Label</th><th>Avant</th><th>Ancré</th><th>Économie</th></tr></thead>
+        <thead><tr><th>ID</th><th>Label</th><th>Before</th><th>Anchored</th><th>Savings</th></tr></thead>
         <tbody id="sources-tbody"></tbody>
       </table>
     </div>
@@ -160,39 +148,23 @@
     <div class="kpi-grid" id="audit-kpi"></div>
     <div class="chart-row chart-row-2x">
       <div class="panel chart-panel">
-        <div class="panel-head"><h3>Appels / minute</h3><span class="chip" id="calls-total">0</span></div>
+        <div class="panel-head"><h3>Calls / minute</h3><span class="chip" id="calls-total">0</span></div>
         <canvas id="chart-calls2"></canvas>
       </div>
       <div class="panel chart-panel">
-        <div class="panel-head"><h3>Latence p50 / p95</h3><span class="chip" id="lat2-chip">—</span></div>
+        <div class="panel-head"><h3>Latency p50 / p95</h3><span class="chip" id="lat2-chip">—</span></div>
         <canvas id="chart-lat2"></canvas>
       </div>
     </div>
     <div class="chart-row chart-row-2x">
       <div class="panel chart-panel">
-        <div class="panel-head"><h3>Outcomes</h3></div>
+        <div class="panel-head"><h3>Outcomes</h3><button class="more-btn" data-drawer="events">Stream</button></div>
         <canvas id="chart-outcomes"></canvas>
       </div>
       <div class="panel chart-panel">
         <div class="panel-head"><h3>Throughput</h3></div>
         <canvas id="chart-throughput"></canvas>
       </div>
-    </div>
-    <div class="panel">
-      <div class="panel-head">
-        <h3>Flux d'événements</h3>
-        <input type="text" class="search-input" id="audit-search" placeholder="Filtrer…">
-      </div>
-      <table class="data-table">
-        <thead><tr>
-          <th class="sort-th" data-sort="ts">Timestamp ⇅</th>
-          <th class="sort-th" data-sort="tool">Outil ⇅</th>
-          <th class="sort-th" data-sort="session_id">Session ⇅</th>
-          <th class="sort-th" data-sort="outcome">Outcome ⇅</th>
-          <th class="sort-th" data-sort="latency_ms">Latence ⇅</th>
-        </tr></thead>
-        <tbody id="audit-tbody"></tbody>
-      </table>
     </div>
   </section>
 
@@ -201,18 +173,18 @@
     <div class="kpi-grid" id="tools-kpi"></div>
     <div class="chart-row chart-row-2x">
       <div class="panel chart-panel">
-        <div class="panel-head"><h3>Distribution par outil</h3><span class="chip" id="tools-chip">—</span></div>
+        <div class="panel-head"><h3>Distribution by tool</h3><span class="chip" id="tools-chip">—</span></div>
         <canvas id="chart-pie"></canvas>
       </div>
       <div class="panel chart-panel">
-        <div class="panel-head"><h3>Appels par outil</h3></div>
+        <div class="panel-head"><h3>Calls per tool</h3></div>
         <canvas id="chart-tools-bar"></canvas>
       </div>
     </div>
     <div class="panel">
-      <div class="panel-head"><h3>Détail par outil</h3></div>
+      <div class="panel-head"><h3>Per-tool detail</h3></div>
       <table class="data-table">
-        <thead><tr><th>Outil</th><th>Calls</th><th>Distribution</th><th>Ratio</th></tr></thead>
+        <thead><tr><th>Tool</th><th>Calls</th><th>Distribution</th><th>Ratio</th></tr></thead>
         <tbody id="tools-tbody"></tbody>
       </table>
     </div>
@@ -223,14 +195,14 @@
     <div class="kpi-grid" id="inv-kpi"></div>
     <div class="chart-row chart-row-2x">
       <div class="panel chart-panel">
-        <div class="panel-head"><h3>Par type</h3><span class="chip" id="inv-total">0</span></div>
+        <div class="panel-head"><h3>By type</h3><span class="chip" id="inv-total">0</span></div>
         <canvas id="chart-inv"></canvas>
       </div>
     </div>
     <div class="panel">
-      <div class="panel-head"><h3>Invariants détectés</h3></div>
+      <div class="panel-head"><h3>Detected invariants</h3></div>
       <table class="data-table">
-        <thead><tr><th>Type</th><th>Count</th><th>Couverture</th></tr></thead>
+        <thead><tr><th>Type</th><th>Count</th><th>Coverage</th></tr></thead>
         <tbody id="inv-tbody"></tbody>
       </table>
     </div>
@@ -241,7 +213,7 @@
     <div class="kpi-grid" id="sess-kpi"></div>
     <div class="chart-row chart-row-2x">
       <div class="panel chart-panel">
-        <div class="panel-head"><h3>Hits par session</h3><span class="chip" id="sess-chip">—</span></div>
+        <div class="panel-head"><h3>Hits per session</h3><span class="chip" id="sess-chip">—</span></div>
         <canvas id="chart-sessions"></canvas>
       </div>
     </div>
@@ -276,7 +248,7 @@
         <div class="panel-head"><h3>P1 — Semantic Search</h3><span class="tag tag-green" id="p1-status">Active</span></div>
         <div class="upgrade-detail" id="p1-detail">
           <div class="ud-row"><span class="ud-label">Backend</span><span class="ud-val mono" id="p1-backend">—</span></div>
-          <div class="ud-row"><span class="ud-label">Modèle</span><span class="ud-val mono" id="p1-model">—</span></div>
+          <div class="ud-row"><span class="ud-label">Model</span><span class="ud-val mono" id="p1-model">—</span></div>
           <div class="ud-row"><span class="ud-label">Dimensions</span><span class="ud-val mono" id="p1-dim">—</span></div>
           <div class="ud-row"><span class="ud-label">Vectors</span><span class="ud-val mono" id="p1-vecs">—</span></div>
           <div class="ud-row"><span class="ud-label">Index size</span><span class="ud-val mono" id="p1-size">—</span></div>
@@ -287,7 +259,7 @@
         <div class="panel-head"><h3>P2 — Cross-Session</h3><span class="tag tag-blue" id="p2-status">Active</span></div>
         <div class="upgrade-detail" id="p2-detail">
           <div class="ud-row"><span class="ud-label">Transfers</span><span class="ud-val mono" id="p2-xfers">—</span></div>
-          <div class="ud-row"><span class="ud-label">Sessions liées</span><span class="ud-val mono" id="p2-linked">—</span></div>
+          <div class="ud-row"><span class="ud-label">Linked sessions</span><span class="ud-val mono" id="p2-linked">—</span></div>
           <div class="ud-row"><span class="ud-label">WAL mode</span><span class="ud-val mono" id="p2-wal">ON</span></div>
           <div class="ud-row"><span class="ud-label">Locking</span><span class="ud-val mono" id="p2-lock">msvcrt</span></div>
           <div class="ud-row"><span class="ud-label">Junction table</span><span class="ud-val mono" id="p2-table">session_chunks</span></div>
@@ -306,11 +278,127 @@
     <div class="panel">
       <div class="panel-head"><h3>17 MCP Tools</h3><span class="chip" id="tools-chip">—</span></div>
       <table class="data-table">
-        <thead><tr><th>Tool</th><th>Priorité</th><th>Description</th><th>Statut</th></tr></thead>
+        <thead><tr><th>Tool</th><th>Priority</th><th>Description</th><th>Status</th></tr></thead>
         <tbody id="upg-tools-tbody"></tbody>
       </table>
     </div>
   </section>
+
+  <!-- QUICKSTART -->
+  <section class="view" id="view-quickstart">
+    <div class="doc-hero">
+      <h2>Get started in 3 steps</h2>
+      <p>Loom keeps your session context so agents don't re-read everything. Here's how to use it.</p>
+    </div>
+    <div class="doc-steps">
+      <div class="doc-step">
+        <div class="ds-num">1</div>
+        <div class="ds-body">
+          <h3>Store — cache your context</h3>
+          <p>Call <code>ctx_store</code> with a large output (command, file, analysis). Loom splits it into chunks and indexes it.</p>
+          <div class="doc-code mono">ctx_store(content, session_id, label="session/type/name")</div>
+        </div>
+      </div>
+      <div class="doc-step">
+        <div class="ds-num">2</div>
+        <div class="ds-body">
+          <h3>Search — retrieve without re-reading</h3>
+          <p>Before re-reading a file, search first. You get the chunk by ID instead of re-injecting the whole text.</p>
+          <div class="doc-code mono">ctx_search(query, session_id) → chunk_id<br>ctx_get(chunk_id)</div>
+        </div>
+      </div>
+      <div class="doc-step">
+        <div class="ds-num">3</div>
+        <div class="ds-body">
+          <h3>Observe — watch the savings</h3>
+          <p>This dashboard shows calls, latency and <b>tokens saved</b> live. That's your proof of gain.</p>
+        </div>
+      </div>
+    </div>
+    <div class="doc-callout">💡 <b>Golden rule:</b> if an output exceeds ~100 tokens, store it. If you already read it, search before re-reading.</div>
+  </section>
+
+  <!-- HOW-TO -->
+  <section class="view" id="view-howto">
+    <div class="doc-hero"><h2>How-to — common tasks</h2><p>Copy-paste recipes for frequent cases.</p></div>
+    <div class="doc-grid">
+      <div class="panel doc-card">
+        <h3>📥 Store a terminal output</h3>
+        <p>A build, a scan, a large log: send it to the cache with a clear label.</p>
+        <div class="doc-code mono">ctx_store_cmd(cmd, output, session_id)</div>
+      </div>
+      <div class="panel doc-card">
+        <h3>📄 Store a file</h3>
+        <p>Before analyzing a long file, cache it once.</p>
+        <div class="doc-code mono">ctx_store_file(path, session_id)</div>
+      </div>
+      <div class="panel doc-card">
+        <h3>🔍 Retrieve a chunk</h3>
+        <p>Semantic search (meaning) with automatic text fallback (FTS).</p>
+        <div class="doc-code mono">ctx_search("firewall rule", session)</div>
+      </div>
+      <div class="panel doc-card">
+        <h3>🔗 Transfer between sessions</h3>
+        <p>Reuse a chunk from another session without copying it.</p>
+        <div class="doc-code mono">ctx_transfer(chunk_id, target_session)</div>
+      </div>
+      <div class="panel doc-card">
+        <h3>🧹 Purge / clean up</h3>
+        <p>Remove a session or expired chunks (TTL), then compact.</p>
+        <div class="doc-code mono">ctx_purge_session(sid)<br>ctx_purge_expired() · ctx_vacuum()</div>
+      </div>
+      <div class="panel doc-card">
+        <h3>⚙️ Rebuild the vector index</h3>
+        <p>After a large import, regenerate the HNSW index for semantic search.</p>
+        <div class="doc-code mono">ctx_rebuild_index()</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HELP -->
+  <section class="view" id="view-help">
+    <div class="doc-hero"><h2>Help — glossary & FAQ</h2><p>What the numbers and words in the dashboard mean.</p></div>
+    <div class="panel">
+      <div class="panel-head"><h3>Glossary</h3></div>
+      <table class="data-table">
+        <thead><tr><th>Term</th><th>Definition</th></tr></thead>
+        <tbody>
+          <tr><td><b>Session</b></td><td>A thread of work (conversation, task). Each session has its own context.</td></tr>
+          <tr><td><b>Chunk</b></td><td>A piece of stored content. It's the base unit of the cache.</td></tr>
+          <tr><td><b>Anchor</b></td><td>Anchored version of a chunk: the compressed/summarized text that replaces the original.</td></tr>
+          <tr><td><b>Savings</b></td><td>% of tokens saved = (tokens before − anchored tokens) / tokens before. Higher is better.</td></tr>
+          <tr><td><b>Invariant</b></td><td>A stable value detected in the content (constant, key, hash) — can be verified later.</td></tr>
+          <tr><td><b>Hit / Miss</b></td><td><b>Hit</b> = the cache served the content (no re-computation). <b>Miss</b> = absent, it had to be produced.</td></tr>
+          <tr><td><b>Hit rate</b></td><td>% of calls served by the cache. Goal: as high as possible.</td></tr>
+          <tr><td><b>p50 / p95</b></td><td>Latency: p50 = median (half are faster), p95 = the worst 5%.</td></tr>
+          <tr><td><b>FTS</b></td><td>Full-Text Search — keyword search, used as a fallback for semantic search.</td></tr>
+          <tr><td><b>HNSW</b></td><td>A fast vector index type, to retrieve chunks by their meaning.</td></tr>
+          <tr><td><b>T0 / static</b></td><td>Content never reloaded (0 tokens per turn), so free to reuse.</td></tr>
+          <tr><td><b>WAL</b></td><td>Write-Ahead Logging: SQLite mode that avoids blocking on concurrent writes.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>FAQ</h3></div>
+      <div class="doc-faq">
+        <div class="doc-q"><b>Why is my savings % low?</b><p>The cache is empty or underused: store more outputs and search before re-reading. The % rises once chunks are reused.</p></div>
+        <div class="doc-q"><b>p95 latency is high (e.g. 30,000 ms), is that bad?</b><p>A high p95 = a few very slow calls (large payloads, first embedding-model load). Look for a token spike or a heavy write at the same moment.</p></div>
+        <div class="doc-q"><b>Difference between ctx_store and ctx_search?</b><p><b>store</b> writes to the cache, <b>search</b> reads from it. Store once, search as many times as needed.</p></div>
+        <div class="doc-q"><b>Are my chunks indexed for the vector store?</b><p>View <b>Upgrade P1-P3</b> → <b>Coverage</b> card. If &lt; 100%, run <code>ctx_rebuild_index()</code>.</p></div>
+        <div class="doc-q"><b>How do I know if the cache works?</b><p>View <b>Overview</b>: the <b>Savings</b> donut and the <b>Hit rate</b> card. High savings + high hit rate = effective cache.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Detail drawer (side-panel) -->
+  <div class="drawer-scrim" id="drawer-scrim"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawer-head">
+      <h2 id="drawer-title">Details</h2>
+      <button class="drawer-close" id="drawer-close" aria-label="Close">✕</button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+  </aside>
 
   <!-- Footer -->
   <footer class="footer">
@@ -321,6 +409,6 @@
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
-<script src="/static/app.js"></script>
+<script src="/static/app.js?v=8"></script>
 </body>
 </html>

@@ -238,3 +238,27 @@ n'écrit **jamais** sur stdout (stdout appartient au JSON-RPC sur stdio).
    qu'aucun chiffre invalide ne soit repris par erreur.
 5. Rejouer le bench « grand contexte » avec un modèle cloud pour statuer le critère des 35 %.
 6. Supprimer la branche `loom-semantic` une fois la migration close.
+
+## 12. Session du 2026-11-04 — Dashboard v4 refonte + repair
+
+**Périmètre :** `dash/` uniquement (aucun changement du moteur `src/loom/`).
+
+- **Refonte visuelle et simplifiée** : palette claire lumineuse (glassmorphism, gradients radial),
+  panneaux simplifiés, détails déplacés dans un drawer latéral accessible via clic,
+  graphiques simples en canvas (calls/min, latence p50/p95, savings), suppression du blablabla.
+- **Sections doc en anglais** : 3 nouvelles sections nav — **Quickstart**, **How-to**, **Help** —
+  rendues en anglais, comme le reste du dashboard (`lang="en"`, `?v=8`).
+- **Debug SSE :** l'état « connecting... » permanent + cartes vides n'était pas CORS au premier
+  abord — cause racine : **`SyntaxError` dans `dash/static/app.js:901`**
+  (`linked+' 'sessions linked'` introduit par la traduction EN — tout le script ne s'exécutait
+  pas). Fix : `linked+' sessions linked'` ; `node --check dash/static/app.js` → exit 0.
+- **Fix secondaire server.py** : headers `Access-Control-Allow-Origin: *` +
+  `Access-Control-Allow-Headers: Cache-Control` sur le endpoint `GET /api/stream` (SSE), pour les
+  navigateurs stricts sur EventSource.
+- **Vérifications mesurées** : `curl http://localhost:8775/api/snapshot` → 200, `db.exists:true`,
+  48 sessions, 1684 chunks, 171 sources, `saved_ratio: 0.5481` ; `curl /api/stream` → 200
+  `text/event-stream` avec headers CORS et flux `data:`.
+- **Cache-busting :** `?v=7` → `?v=8` sur `app.js`/`style.css` dans `index.html`.
+- **Reste / non vérifié :** rendu navigateur complet post hard-refresh `Ctrl+Shift+R` non confirmé
+  par capture dans cette session (serveur OK, JS parse OK) ; suite de tests moteur non rejouée
+  (inchangée — voir §4, état 2026-10-25).

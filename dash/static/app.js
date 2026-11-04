@@ -122,7 +122,7 @@ function chartCalls(id, audit){
   var counts=audit.series_counts&&Object.keys(audit.series_counts).length?audit.series_counts:derived.counts;
   var labels=audit.series_labels&&audit.series_labels.length?audit.series_labels:derived.labels;
   var n=labels.length;
-  if(!n||!tools.length){ empty(ctx,w,h,'En attente d\'événements…'); return; }
+  if(!n||!tools.length){ empty(ctx,w,h,'Waiting for events…'); return; }
   var stacks=[]; for(var i=0;i<n;i++) stacks.push(0);
   tools.forEach(function(t){ var a=counts[t]||[]; for(var k=0;k<n;k++) stacks[k]+=(a[k]||0); });
   var maxV=Math.max(1,Math.max.apply(null,stacks));
@@ -296,7 +296,7 @@ function chartTokens(id, db){
     ctx.font='600 10px JetBrains Mono'; ctx.fillStyle='#e9eef7'; ctx.textAlign='left';
     ctx.fillText(anc, pad.l+bw2+6, y+barH*0.62/2+3);
   });
-  legend(ctx,['ancré','avant'],w,pad,12,[[color(1)],[hexA(color(0),0.4)]]);
+  legend(ctx,['anchored','before'],w,pad,12,[[color(1)],[hexA(color(0),0.4)]]);
   set('saved-chip', Math.round((db.saved_ratio||0)*100)+'% saved');
 }
 
@@ -441,7 +441,7 @@ function legV(ctx,pairs,w,h){
 /* ---------- empty state ---------- */
 function empty(ctx,w,h,msg){
   ctx.fillStyle='#56627a'; ctx.font='12px Inter'; ctx.textAlign='center';
-  ctx.fillText(msg||'Aucune donnée', w/2, h/2);
+  ctx.fillText(msg||'No data', w/2, h/2);
 }
 
 /* ============================================================
@@ -497,6 +497,61 @@ function kpiCard(label,val,sub,ci,sparkId){
     (sub?'<div class="kpi-sub">'+sub+'</div>':'')+sp+'</div>';
 }
 
+/* ============================================================
+   SIDE PANEL (drawer)
+   ============================================================ */
+var curDrawer=null;
+var drawerRenderers={
+  kpi:function(body,snap){
+    var db=snap.db||{},a=snap.audit||{},m=computeMetrics(db,a);
+    var savedPct=Math.round((db.saved_ratio||0)*100);
+    body.innerHTML='<div class="kpi-grid">'+[
+      kpiCard('Sessions',db.sessions||0,'context actifs',0),
+      kpiCard('Chunks',db.chunks||0,(db.sources||0)+' sources',1),
+      kpiCard('Anchors',db.anchors||0,null,2),
+      kpiCard('Invariants',db.invariants||0,null,3),
+      kpiCard('Tokens saved',fmtN(m.totalSaved),'sur '+fmtN(m.totalBefore),4),
+      kpiCard('Avg latence',(Math.round(m.avgLat*100)/100)+' ms',null,0),
+      kpiCard('Hit rate',Math.round(m.hitRate)+'%','cache',4),
+      kpiCard('Taille DB',fmtB(db.size_bytes),db.encrypted?'encrypted':'plain',5),
+      kpiCard('Erreurs',m.errs,'sur '+evsLen(a)+' evts',8),
+      kpiCard('Savings',savedPct+'%','tokens saved',4)
+    ].join('')+'</div>';
+  },
+  sources:function(body,snap){
+    var db=snap.db||{};
+    var data=db.tokens_per_store||[];
+    if(!data.length){ body.innerHTML='<p style="color:var(--dim)">No sources.</p>'; return; }
+    body.innerHTML='<table class="data-table"><thead><tr><th>Label</th><th>Before</th><th>Anchored</th><th>Savings</th></tr></thead><tbody>'+
+      data.map(function(d){
+        var bef=d.tokens_before||0, anc=d.anchor_tokens||0, saved=bef>0?Math.round((1-anc/bef)*100):0;
+        return '<tr><td>'+(d.label||('#'+d.id))+'</td><td class="mono">'+bef+'</td><td class="mono">'+anc+'</td><td class="mono">'+saved+'%</td></tr>';
+      }).join('')+'</tbody></table>';
+  },
+  events:function(body,snap){
+    var evs=(snap.audit||{}).recent_events||[];
+    body.innerHTML='<input type="text" class="search-input" id="dw-search" placeholder="Filtrer…" style="width:100%;margin-bottom:10px">'+
+      '<table class="data-table"><thead><tr><th>Heure</th><th>Outil</th><th>Session</th><th>Outcome</th><th>Latence</th></tr></thead><tbody id="dw-events"></tbody></table>';
+    renderEvents(evs,'dw-events','');
+    var inp=$('dw-search');
+    if(inp) inp.addEventListener('input',function(){ renderEvents(evs,'dw-events',inp.value); });
+  }
+};
+function openDrawer(kind){
+  var r=drawerRenderers[kind]; if(!r||!lastSnap) return;
+  var titles={kpi:'Details — Overview',sources:'Details — Sources',events:'Event stream'};
+  set('drawer-title', titles[kind]||'Details');
+  curDrawer=kind;
+  r($('drawer-body'), lastSnap);
+  $('drawer').classList.add('open'); $('drawer-scrim').classList.add('open');
+  $('drawer').setAttribute('aria-hidden','false');
+}
+function closeDrawer(){
+  curDrawer=null;
+  $('drawer').classList.remove('open'); $('drawer-scrim').classList.remove('open');
+  $('drawer').setAttribute('aria-hidden','true');
+}
+
 function render(snap){
   if(!snap) return;
   lastSnap=snap; lastMsg=Date.now();
@@ -504,7 +559,7 @@ function render(snap){
   var m=computeMetrics(db,a);
   totalEvents=a.total_events||0;
   set('ss-updated', new Date((snap.ts||0)*1000).toLocaleTimeString('fr-CA',{hour12:false}));
-  if(db.db_path){ lastDB=db.db_path; var el=$('ss-db'); el.textContent=lastDB.split(/[\\/]/).pop(); el.title=lastDB; }
+  if(db.db_path){ lastDB=db.db_path; var el=$('ss-db'); if(el){ el.textContent=lastDB.split(/[\\/]/).pop(); el.title=lastDB; } }
   set('ss-events', totalEvents);
   set('last-update', new Date((snap.ts||0)*1000).toLocaleTimeString('fr-CA',{hour12:false}));
   set('db-info', (db.encrypted?'🔒 ':'')+fmtB(db.size_bytes)+' · '+db.chunks+' chunks');
@@ -515,39 +570,31 @@ function render(snap){
   set('tb-evcount', fmtN(totalEvents)+' events');
   var savedPct=Math.round((db.saved_ratio||0)*100);
 
-  // ---- OVERVIEW ----
+  // ---- OVERVIEW (clean: 4 KPI + 3 charts) ----
   $('kpi-grid').innerHTML=[
     kpiCard('Sessions',db.sessions||0,'context actifs',0,'spark-sess'),
     kpiCard('Chunks',db.chunks||0,db.sources+' sources',1,'spark-chunks'),
-    kpiCard('Anchors',db.anchors||0,null,2),
-    kpiCard('Invariants',db.invariants||0,null,3),
-    kpiCard('Économie',savedPct+'%','tokens sauvés',4),
-    kpiCard('Taille DB',fmtB(db.size_bytes),db.encrypted?'chiffré':'clair',5),
-    kpiCard('Appels/min',Math.round((a.calls_per_min||0)*10)/10,'60 s',6,'spark-rate'),
-    kpiCard('Latence p95',Math.round(m.p95)+' ms','peak '+Math.round(m.peak),7,'spark-lat'),
-    kpiCard('Erreurs',m.errs,'sur '+evsLen(a)+' evts',8),
-    kpiCard('Tokens sauvés',fmtN(m.totalSaved),'sur '+fmtN(m.totalBefore),2,'spark-tok'),
-    kpiCard('Avg latence',Math.round(m.avgLat*100)/100+' ms',null,0),
-    kpiCard('Hit rate',Math.round(m.hitRate)+'%','cache',4)
+    kpiCard('Savings',savedPct+'%',fmtN(m.totalSaved)+' tok',4),
+    kpiCard('Latence p95',Math.round(m.p95)+' ms','peak '+Math.round(m.peak),7,'spark-lat')
   ].join('');
   chartCalls('chart-calls', a);
   chartLat('chart-lat', a, 'lat-max');
   renderEvents(a.recent_events||[], 'events-tbody', $('event-search')?$('event-search').value:'');
   chartSpark('spark-sess', rateBuf);
-  chartSpark('spark-rate', rateBuf);
+  chartSpark('spark-chunks', rateBuf);
   chartSpark('spark-lat', latencyHist);
-  chartSpark('spark-tok', tokenHist);
   if($('chart-gauge')) chartGauge('chart-gauge', savedPct, 'saved');
+  if(curDrawer && $('drawer').classList.contains('open')) openDrawer(curDrawer);
 
   // ---- STORAGE ----
   $('store-kpi').innerHTML=[
     kpiCard('Sources',db.sources||0,null,1),
     kpiCard('Chunks',db.chunks||0,'avg '+Math.round(m.avgChunk)+' tok',0),
     kpiCard('Anchors',db.anchors||0,null,2),
-    kpiCard('Économie',savedPct+'%',fmtN(m.totalSaved)+' tok sauvés',4),
-    kpiCard('Taille',fmtB(db.size_bytes),db.encrypted?'chiffré':'clair',5),
+    kpiCard('Savings',savedPct+'%',fmtN(m.totalSaved)+' tok saved',4),
+    kpiCard('Size',fmtB(db.size_bytes),db.encrypted?'encrypted':'plain',5),
     kpiCard('Tokens avant',fmtN(m.totalBefore),'total',6),
-    kpiCard('Tokens ancré',fmtN(m.totalAnchor),'total',0),
+    kpiCard('Anchored tokens',fmtN(m.totalAnchor),'total',0),
     kpiCard('Avg chunk',Math.round(m.avgChunk)+' tok','par chunk',3)
   ].join('');
   chartTokens('chart-tokens', db);
@@ -558,7 +605,7 @@ function render(snap){
 
   // ---- AUDIT ----
   $('audit-kpi').innerHTML=[
-    kpiCard('Événements',totalEvents,'total',3),
+    kpiCard('Events',totalEvents,'total',3),
     kpiCard('Appels/min',Math.round((a.calls_per_min||0)*10)/10,'60 s',6),
     kpiCard('p50',Math.round(m.p50)+' ms',null,0),
     kpiCard('p95',Math.round(m.p95)+' ms',null,7),
@@ -626,7 +673,7 @@ function renderEvents(evs, tbodyId, filter){
     return (va<vb?-1:va>vb?1:0)*evSortDir;
   });
   rows=rows.slice(0,100);
-  if(!rows.length){ tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:#56627a;padding:24px">Aucun événement</td></tr>'; return; }
+  if(!rows.length){ tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:#56627a;padding:24px">No events</td></tr>'; return; }
   tb.innerHTML=rows.map(function(e){
     var bad=(e.outcome||'').toLowerCase().indexOf('err')>=0||(e.outcome||'').toLowerCase().indexOf('denied')>=0;
     var hit=(e.outcome||'').toLowerCase().indexOf('hit')>=0;
@@ -638,7 +685,7 @@ function short(s){ if(!s) return '—'; s=s.toString(); return s.length>14?s.sli
 
 function renderSources(data){
   var tb=$('sources-tbody'); if(!tb) return;
-  if(!data.length){ tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:#56627a;padding:24px">Aucune source</td></tr>'; return; }
+  if(!data.length){ tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:#56627a;padding:24px">No sources</td></tr>'; return; }
   tb.innerHTML=data.map(function(d){
     var bef=d.tokens_before||0, anc=d.anchor_tokens||0, saved=bef>0?Math.round((1-anc/bef)*100):0;
     var lbl=(d.label||('#'+d.id))+'';
@@ -648,7 +695,7 @@ function renderSources(data){
 function renderInvariants(inv){
   var tb=$('inv-tbody'); if(!tb) return;
   var total=inv.reduce(function(s,k){return s+(k.n||0);},0)||1;
-  if(!inv.length){ tb.innerHTML='<tr><td colspan="3" style="text-align:center;color:#56627a;padding:24px">Aucun invariant</td></tr>'; return; }
+  if(!inv.length){ tb.innerHTML='<tr><td colspan="3" style="text-align:center;color:#56627a;padding:24px">No invariants</td></tr>'; return; }
   tb.innerHTML=inv.map(function(k,i){
     var n=k.n||0, pct=Math.round(n/total*100);
     return '<tr><td><b style="color:'+color(i)+'">'+(k.kind||'')+'</b></td><td class="mono">'+n+'</td><td><div class="bar-cell"><div class="mini-bar"><span style="width:'+pct+'%;background:'+color(i)+'"></span></div><span class="mono">'+pct+'%</span></div></td></tr>';
@@ -656,14 +703,14 @@ function renderInvariants(inv){
 }
 function renderSessions(sess){
   var tb=$('sess-tbody'); if(!tb) return;
-  if(!sess.length){ tb.innerHTML='<tr><td colspan="2" style="text-align:center;color:#56627a;padding:24px">Aucune session</td></tr>'; return; }
+  if(!sess.length){ tb.innerHTML='<tr><td colspan="2" style="text-align:center;color:#56627a;padding:24px">No sessions</td></tr>'; return; }
   tb.innerHTML=sess.map(function(s,i){
     return '<tr><td class="mono">'+(s.session_id||'')+'</td><td><div class="bar-cell"><div class="mini-bar"><span style="width:'+Math.min(100,(s.hits||0)*10)+'%"></span></div><span class="mono">'+(s.hits||0)+'</span></div></td></tr>';
   }).join('');
 }
 function renderToolsTable(ti, m){
   var tb=$('tools-tbody'); if(!tb) return;
-  if(!ti.length){ tb.innerHTML='<tr><td colspan="4" style="text-align:center;color:#56627a;padding:24px">Aucun outil</td></tr>'; return; }
+  if(!ti.length){ tb.innerHTML='<tr><td colspan="4" style="text-align:center;color:#56627a;padding:24px">No tools</td></tr>'; return; }
   var maxN=Math.max.apply(null,ti.map(function(t){return t.n;}))||1;
   var tot=ti.reduce(function(s,t){return s+t.n;},0)||1;
   tb.innerHTML=ti.map(function(t,i){
@@ -687,10 +734,13 @@ function chartOutcomes(id, audit){
 var TITLES={
   overview:['Overview','Real-time context cache observability'],
   storage:['Storage','Base de contexte & sources'],
-  audit:['Audit Live','Flux d\'événements en direct'],
+  audit:['Audit Live','Live event stream'],
   tools:['Outils','Distribution & performance par outil'],
-  invariants:['Invariants','Détection de valeurs stables'],
-  sessions:['Sessions','Activité par session']
+  invariants:['Invariants','Stable value detection'],
+  sessions:['Sessions','Activity by session'],
+  quickstart:['Quickstart','Get started in 3 steps'],
+  howto:['How-to','Recettes pour tâches courantes'],
+  help:['Help','Glossaire & FAQ']
 };
 function switchSection(sec){
   activeSection=sec;
@@ -746,22 +796,26 @@ setInterval(function(){
 
 function initButtons(){
   document.querySelectorAll('.nav-item').forEach(function(b){ b.addEventListener('click',function(){ switchSection(b.dataset.section); }); });
+  document.querySelectorAll('.more-btn').forEach(function(b){ b.addEventListener('click',function(){ openDrawer(b.dataset.drawer); }); });
+  var dc=$('drawer-close'); if(dc) dc.addEventListener('click',closeDrawer);
+  var ds=$('drawer-scrim'); if(ds) ds.addEventListener('click',closeDrawer);
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeDrawer(); });
   $('btn-pause').addEventListener('click',function(){
     paused=!paused; $('pause-ico').textContent=paused?'▶':'⏸'; $('pause-txt').textContent=paused?'Resume':'Pause';
     if(paused){ setState('paused'); if(es) try{es.close();}catch(e){} toast('Stream en pause'); }
     else { connect(); toast('Stream repris'); }
   });
-  $('btn-refresh').addEventListener('click',function(){ fetchSnap(); toast('Snapshot rafraîchi'); });
+  $('btn-refresh').addEventListener('click',function(){ fetchSnap(); toast('Snapshot refreshed'); });
   $('btn-reconnect').addEventListener('click',function(){ connect(); toast('Reconnexion…'); });
   $('btn-export').addEventListener('click',function(){
-    if(!lastSnap){ toast('Aucun snapshot'); return; }
+    if(!lastSnap){ toast('No snapshot'); return; }
     var blob=new Blob([JSON.stringify(lastSnap,null,2)],{type:'application/json'});
     var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='loom-snapshot-'+Date.now()+'.json'; a.click(); URL.revokeObjectURL(a.href);
-    toast('Snapshot exporté');
+    toast('Snapshot exported');
   });
   $('btn-expand').addEventListener('click',function(){
     document.body.classList.toggle('expanded');
-    toast(document.body.classList.contains('expanded')?'Panneaux étendus':'Panneaux normaux');
+    toast(document.body.classList.contains('expanded')?'Panels expanded':'Panels normal');
     if(lastSnap) setTimeout(function(){redrawAll(lastSnap);},100);
   });
   $('btn-compact').addEventListener('click',function(){
@@ -790,7 +844,7 @@ function initButtons(){
     });
   });
   document.querySelectorAll('.accent-btn').forEach(function(b){
-    b.addEventListener('click',function(){ setTheme(b.dataset.theme); toast('Thème: '+b.dataset.theme); });
+    b.addEventListener('click',function(){ setTheme(b.dataset.theme); toast('Theme: '+b.dataset.theme); });
   });
   $('btn-autoscale').addEventListener('click',function(){
     autoScale=!autoScale; $('btn-autoscale').classList.toggle('on',autoScale);
@@ -844,11 +898,11 @@ function renderUpgrade(db,a,m){
     kpiCard('Vectors',vi.n_vectors||0,vi.model||'all-MiniLM-L6-v2',4),
     kpiCard('Index size',fmtB(vi.index_size_bytes||0),'HNSW',5),
     kpiCard('Coverage',cov+'%',(vi.n_vectors||0)+' / '+db.chunks+' chunks',2),
-    kpiCard('Transfers',xfers,linked+' sessions liées',0),
+    kpiCard('Transfers',xfers,linked+' sessions linked',0),
     kpiCard('Auto-store',autoHits,'hits (threshold 500)',6),
     kpiCard('Backend',vi.backend||'—','embedding model',1),
     kpiCard('Dim',vi.dim||384,'vector dimensions',3),
-    kpiCard('Tools',17,'MCP exposés',7)
+    kpiCard('Tools',17,'MCP exposed',7)
   ].join('');
   // P1 detail
   set('p1-backend',vi.backend||'—');
@@ -869,7 +923,7 @@ function renderUpgrade(db,a,m){
   ], 'vec-chip');
   chartBars('chart-xfer', [
     {label:'Transfers', n:xfers},
-    {label:'Sessions liées', n:linked}
+    {label:'Linked sessions', n:linked}
   ], 'label', 'n', 'xfer-chip');
   chartSpark('chart-autostore', [autoHits, autoHits, autoHits]);
   set('auto-chip', autoHits+' hits');

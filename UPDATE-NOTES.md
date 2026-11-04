@@ -5,6 +5,31 @@
 
 ---
 
+## Unreleased — 2026-11-04
+
+### Changed
+
+- **Dashboard v4 rewrite in `dash/`** (no engine change): brighter glass palette, simplified panels
+  with details in a side drawer, standalone simple canvas charts (calls/min, p50/p95 latency,
+  savings), less text. Three new nav sections in English — **Quickstart**, **How-to**, **Help** —
+  plus full dashboard translation to English (`lang="en"`, assets `?v=8`).
+
+### Fixed
+
+- **Dashboard stuck on "connecting..." with empty charts**: a `SyntaxError` at `dash/static/app.js:901`
+  (`linked+' 'sessions linked'`, introduced during the English translation) prevented the whole
+  script from running. Fixed to `linked+' sessions linked'`; `node --check` clean.
+- **SSE endpoint** (`GET /api/stream`) now sends `Access-Control-Allow-Origin: *` and
+  `Access-Control-Allow-Headers: Cache-Control` for strict browsers.
+
+### Verified
+
+- `GET /api/snapshot` → 200 (`db.exists: true`, 48 sessions, 1684 chunks, `saved_ratio: 0.5481`).
+  `GET /api/stream` → 200 `text/event-stream` with CORS headers and live `data:` flux.
+  Full browser render after `Ctrl+Shift+R` not screenshot-verified in this session.
+
+---
+
 ## v0.1.3 — 2026-10-26
 
 **Prepared for publication — the first registry publish is still pending.**
